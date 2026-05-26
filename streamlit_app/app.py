@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import math
+import os
+import zipfile
 
 st.set_page_config(
     page_title="Chunks Maker",
@@ -62,3 +64,78 @@ if uploaded_file is not None:
             f"Total Chunks To Be Created: "
             f"{total_chunks}"
         )
+
+        if st.button("Create Chunks"):
+
+            base_name = os.path.splitext(
+                uploaded_file.name
+            )[0]
+
+            output_folder = (
+                f"{base_name}_chunks"
+            )
+
+            os.makedirs(
+                output_folder,
+                exist_ok=True
+            )
+
+            created_files = []
+
+            for chunk_number in range(total_chunks):
+
+                start_idx = (
+                    chunk_number * chunk_size
+                )
+
+                end_idx = (
+                    start_idx + chunk_size
+                )
+
+                chunk_df = df.iloc[
+                    start_idx:end_idx
+                ]
+
+                output_file = os.path.join(
+                    output_folder,
+                    f"{base_name}_chunk"
+                    f"{chunk_number + 1}.xlsx"
+                )
+
+                chunk_df.to_excel(
+                    output_file,
+                    index=False
+                )
+
+                created_files.append(
+                    output_file
+                )
+
+            zip_file_name = (
+                f"{base_name}_chunks.zip"
+            )
+
+            with zipfile.ZipFile(
+                zip_file_name,
+                "w"
+            ) as zipf:
+
+                for file in created_files:
+
+                    zipf.write(file)
+
+            st.success(
+                "ZIP file created successfully!"
+            )
+
+            with open(
+                zip_file_name,
+                "rb"
+            ) as file:
+
+                st.download_button(
+                    label="Download ZIP File",
+                    data=file,
+                    file_name=zip_file_name,
+                    mime="application/zip"
+                )
