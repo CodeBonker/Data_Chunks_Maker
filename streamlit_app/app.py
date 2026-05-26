@@ -51,7 +51,8 @@ if uploaded_file is not None:
         chunk_size = st.number_input(
             "Rows Per Chunk",
             min_value=1,
-            step=1
+            step=1,
+            value=5000
         )
 
         naming_mode = st.radio(
@@ -65,7 +66,7 @@ if uploaded_file is not None:
         download_mode = st.radio(
             "Download Type",
             [
-                "ZIP File",
+                "Download All (ZIP)",
                 "Excel Files",
                 "CSV Files"
             ]
@@ -80,15 +81,9 @@ if uploaded_file is not None:
             total_rows
         )
 
-    if chunk_size:
-
-        total_chunks = math.ceil(
-            total_rows / chunk_size
-        )
-
-    else:
-
-        total_chunks = 0
+    total_chunks = math.ceil(
+        total_rows / chunk_size
+    )
 
     with col2:
 
@@ -96,13 +91,6 @@ if uploaded_file is not None:
             "Total Chunks",
             total_chunks
         )
-
-    st.subheader("Data Preview")
-
-    st.dataframe(
-        df.head(),
-        use_container_width=True
-    )
 
     original_base_name = os.path.splitext(
         uploaded_file.name
@@ -118,12 +106,73 @@ if uploaded_file is not None:
             "Enter Custom Base Name"
         )
 
+    last_chunk_rows = (
+        total_rows % chunk_size
+    )
+
+    if last_chunk_rows == 0:
+
+        last_chunk_rows = chunk_size
+
+    summary_col1, summary_col2, summary_col3 = st.columns(3)
+
+    with summary_col1:
+
+        st.info(
+            f"""
+Rows Per Chunk:
+{chunk_size}
+"""
+        )
+
+    with summary_col2:
+
+        st.info(
+            f"""
+Last Chunk Rows:
+{last_chunk_rows}
+"""
+        )
+
+    with summary_col3:
+
+        st.info(
+            f"""
+Download Format:
+{download_mode}
+"""
+        )
+
+    estimated_size_mb = (
+        uploaded_file.size / 1024 / 1024
+    )
+
+    estimated_output_size = (
+        estimated_size_mb * 1.1
+    )
+
+    st.subheader("Estimated Output Size")
+
+    st.info(
+        f"""
+Approx Output Size:
+{estimated_output_size:.2f} MB
+"""
+    )
+
+    st.subheader("Data Preview")
+
+    st.dataframe(
+        df.head(),
+        use_container_width=True
+    )
+
     if st.button(
         "Create Chunks",
         use_container_width=True
     ):
 
-        if base_name == "":
+        if naming_mode == "Custom Name" and base_name == "":
 
             st.error(
                 "Custom name cannot be empty"
@@ -216,7 +265,7 @@ if uploaded_file is not None:
 
             status_text.empty()
 
-            if download_mode == "ZIP File":
+            if download_mode == "Download All (ZIP)":
 
                 zip_file_name = (
                     f"{base_name}_chunks.zip"
@@ -248,11 +297,82 @@ if uploaded_file is not None:
                         use_container_width=True
                     )
 
+                for file_path in created_files:
+
+                    if os.path.exists(file_path):
+
+                        os.remove(file_path)
+
+                if os.path.exists(zip_file_name):
+
+                    os.remove(zip_file_name)
+
             else:
 
                 st.success(
                     "Chunk files created successfully!"
                 )
+
+                batch_size = 10
+
+                total_batches = math.ceil(
+                    len(created_files) / batch_size
+                )
+
+                st.subheader("Batch Downloads")
+
+                for batch_number in range(total_batches):
+
+                    batch_files = created_files[
+                        batch_number * batch_size:
+                        (batch_number + 1) * batch_size
+                    ]
+
+                    batch_zip_name = (
+                        f"{base_name}_batch_"
+                        f"{batch_number + 1}.zip"
+                    )
+
+                    with zipfile.ZipFile(
+                        batch_zip_name,
+                        "w"
+                    ) as batch_zip:
+
+                        for file_path in batch_files:
+
+                            batch_zip.write(file_path)
+
+                    st.markdown(
+                        f"""
+### Batch {batch_number + 1}
+
+Files Included:
+"""
+                    )
+
+                    for file_path in batch_files:
+
+                        st.write(
+                            os.path.basename(file_path)
+                        )
+
+                    with open(
+                        batch_zip_name,
+                        "rb"
+                    ) as file:
+
+                        st.download_button(
+                            label=(
+                                f"Download Batch "
+                                f"{batch_number + 1}"
+                            ),
+                            data=file,
+                            file_name=batch_zip_name,
+                            mime="application/zip",
+                            use_container_width=True
+                        )
+
+                st.subheader("Individual Downloads")
 
                 for file_path in created_files:
 
@@ -264,3 +384,9 @@ if uploaded_file is not None:
                             file_name=os.path.basename(file_path),
                             use_container_width=True
                         )
+
+                for file_path in created_files:
+
+                    if os.path.exists(file_path):
+
+                        os.remove(file_path)
