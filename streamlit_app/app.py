@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import math
 
 st.set_page_config(
     page_title="Chunks Maker",
@@ -44,3 +45,20 @@ if uploaded_file is not None:
     )
 
     st.dataframe(df.head())
+
+    chunk_size = st.number_input(
+        "Enter number of rows per chunk",
+        min_value=1,
+        step=1
+    )
+
+    if chunk_size:
+
+        total_chunks = math.ceil(
+            total_rows / chunk_size
+        )
+
+        st.write(
+            f"Total Chunks To Be Created: "
+            f"{total_chunks}"
+        )
