@@ -12,7 +12,7 @@ st.set_page_config(
 st.title("Chunks Maker")
 
 st.write(
-    "Upload CSV or Excel files and split them into chunks."
+    "Upload your data file and split them into chunks."
 )
 
 uploaded_file = st.file_uploader(
@@ -54,6 +54,37 @@ if uploaded_file is not None:
         step=1
     )
 
+    naming_mode = st.radio(
+        "Choose Naming Mode",
+        [
+            "Automatic Name",
+            "Custom Name"
+        ]
+    )
+
+    original_base_name = os.path.splitext(
+        uploaded_file.name
+    )[0]
+
+    if naming_mode == "Automatic Name":
+
+        base_name = original_base_name
+
+    else:
+
+        base_name = st.text_input(
+            "Enter Custom Base Name"
+        )
+
+    download_mode = st.radio(
+        "Choose Download Type",
+        [
+            "ZIP File",
+            "Excel Files",
+            "CSV Files"
+        ]
+    )
+
     if chunk_size:
 
         total_chunks = math.ceil(
@@ -67,75 +98,132 @@ if uploaded_file is not None:
 
         if st.button("Create Chunks"):
 
-            base_name = os.path.splitext(
-                uploaded_file.name
-            )[0]
+            if base_name == "":
 
-            output_folder = (
-                f"{base_name}_chunks"
-            )
-
-            os.makedirs(
-                output_folder,
-                exist_ok=True
-            )
-
-            created_files = []
-
-            for chunk_number in range(total_chunks):
-
-                start_idx = (
-                    chunk_number * chunk_size
+                st.error(
+                    "Custom name cannot be empty"
                 )
 
-                end_idx = (
-                    start_idx + chunk_size
+            else:
+
+                output_folder = (
+                    f"{base_name}_chunks"
                 )
 
-                chunk_df = df.iloc[
-                    start_idx:end_idx
-                ]
-
-                output_file = os.path.join(
+                os.makedirs(
                     output_folder,
-                    f"{base_name}_chunk"
-                    f"{chunk_number + 1}.xlsx"
+                    exist_ok=True
                 )
 
-                chunk_df.to_excel(
-                    output_file,
-                    index=False
-                )
+                created_files = []
 
-                created_files.append(
-                    output_file
-                )
+                progress_bar = st.progress(0)
 
-            zip_file_name = (
-                f"{base_name}_chunks.zip"
-            )
+                for chunk_number in range(total_chunks):
 
-            with zipfile.ZipFile(
-                zip_file_name,
-                "w"
-            ) as zipf:
+                    start_idx = (
+                        chunk_number * chunk_size
+                    )
 
-                for file in created_files:
+                    end_idx = (
+                        start_idx + chunk_size
+                    )
 
-                    zipf.write(file)
+                    chunk_df = df.iloc[
+                        start_idx:end_idx
+                    ]
 
-            st.success(
-                "ZIP file created successfully!"
-            )
+                    if any(
+                        char.isdigit()
+                        for char in base_name
+                    ):
 
-            with open(
-                zip_file_name,
-                "rb"
-            ) as file:
+                        file_base = (
+                            f"{base_name}_"
+                            f"{chunk_number + 1}"
+                        )
 
-                st.download_button(
-                    label="Download ZIP File",
-                    data=file,
-                    file_name=zip_file_name,
-                    mime="application/zip"
-                )
+                    else:
+
+                        file_base = (
+                            f"{base_name}_chunk"
+                            f"{chunk_number + 1}"
+                        )
+
+                    if download_mode == "CSV Files":
+
+                        output_file = os.path.join(
+                            output_folder,
+                            f"{file_base}.csv"
+                        )
+
+                        chunk_df.to_csv(
+                            output_file,
+                            index=False
+                        )
+
+                    else:
+
+                        output_file = os.path.join(
+                            output_folder,
+                            f"{file_base}.xlsx"
+                        )
+
+                        chunk_df.to_excel(
+                            output_file,
+                            index=False
+                        )
+
+                    created_files.append(output_file)
+
+                    progress_bar.progress(
+                        (chunk_number + 1)
+                        / total_chunks
+                    )
+
+                if download_mode == "ZIP File":
+
+                    zip_file_name = (
+                        f"{base_name}_chunks.zip"
+                    )
+
+                    with zipfile.ZipFile(
+                        zip_file_name,
+                        "w"
+                    ) as zipf:
+
+                        for file in created_files:
+
+                            zipf.write(file)
+
+                    st.success(
+                        "ZIP file created successfully!"
+                    )
+
+                    with open(
+                        zip_file_name,
+                        "rb"
+                    ) as file:
+
+                        st.download_button(
+                            label="Download ZIP File",
+                            data=file,
+                            file_name=zip_file_name,
+                            mime="application/zip"
+                        )
+
+                else:
+
+                    st.success(
+                        "Chunk files created successfully!"
+                    )
+
+                    for file_path in created_files:
+
+                        with open(file_path, "rb") as file:
+
+                            st.download_button(
+                                label=f"Download {os.path.basename(file_path)}",
+                                data=file,
+                                file_name=os.path.basename(file_path)
+                            )
